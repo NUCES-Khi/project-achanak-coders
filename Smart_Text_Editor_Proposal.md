@@ -2,7 +2,7 @@
 
 |id|Name|
 |-|-|
-|K24-2513|Ansh Kumar|
+|K24-2513|Ansh|
 |K24-2546|Esfan Merchant|
 
 ## Introduction
