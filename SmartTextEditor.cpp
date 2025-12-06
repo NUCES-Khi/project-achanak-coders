@@ -1,66 +1,55 @@
 #include <iostream>
 #include <fstream>
-#include <cstring>
+#include <string>
 using namespace std;
 
-// Tries
-class TrieNode
-{
+// Trie
+class TrieNode{
 public:
     TrieNode *children[26];
     bool isEnd;
 
-    TrieNode()
-    {
+    TrieNode(){
         isEnd = false;
         for (int i = 0; i < 26; i++)
             children[i] = NULL;
     }
 };
 
-class Trie
-{
+class Trie{
 private:
     TrieNode *root;
 
-    // DFS for autocomplete
-    void dfs(TrieNode *node, char *buffer, int depth)
-    {
+    // For autocompletion
+    void dfs(TrieNode *node, string prefix){
         if (node == NULL)
             return;
 
         if (node->isEnd)
-        {
-            buffer[depth] = '\0';
-            cout << buffer << endl;
-        }
+            cout << prefix << endl;
 
-        for (int i = 0; i < 26; i++)
-        {
-            if (node->children[i] != NULL)
-            {
-                buffer[depth] = 'a' + i;
-                dfs(node->children[i], buffer, depth + 1);
+        for (int i = 0; i < 26; i++){
+            if (node->children[i] != NULL){
+                char nextChar = 'a' + i;
+                dfs(node->children[i], prefix + nextChar);
             }
         }
     }
 
 public:
-    Trie()
-    {
+    Trie(){
         root = new TrieNode();
     }
 
-    void insertWord(const char *word)
-    {
+    void insertWord(string word){
         TrieNode *current = root;
 
-        for (int i = 0; word[i] != '\0'; i++)
-        {
+        for (int i = 0; i < word.length(); i++){
             char c = word[i];
 
-            if (c < 'a' || c > 'z')
-                continue; // skip  invalid chars
+            if (c < 'a' || c > 'z') // Ignore Invalid
+                continue;
+
             int index = c - 'a';
 
             if (current->children[index] == NULL)
@@ -68,16 +57,16 @@ public:
 
             current = current->children[index];
         }
+
         current->isEnd = true;
     }
 
-    bool searchWord(const char *word)
-    {
+    bool searchWord(string word){
         TrieNode *current = root;
 
-        for (int i = 0; word[i] != '\0'; i++)
-        {
+        for (int i = 0; i < word.length(); i++){
             int index = word[i] - 'a';
+
             if (index < 0 || index > 25)
                 return false;
 
@@ -86,77 +75,66 @@ public:
 
             current = current->children[index];
         }
+
         return current->isEnd;
     }
 
-    void autocomplete(const char *prefix)
-    {
+    void autocomplete(string prefix){
         TrieNode *current = root;
 
-        for (int i = 0; prefix[i] != '\0'; i++)
-        {
+        for (int i = 0; i < prefix.length(); i++){
             int index = prefix[i] - 'a';
+
             if (current->children[index] == NULL)
             {
                 cout << "No suggestions found.\n";
                 return;
             }
+
             current = current->children[index];
         }
 
-        char buffer[100];
-        int len = 0;
-
-        // prefix to buffer
-        for (len = 0; prefix[len] != '\0'; len++)
-            buffer[len] = prefix[len];
-
-        dfs(current, buffer, len);
+        dfs(current, prefix);
     }
 };
 
 // Hashing
-class HashNode
-{
+class HashNode{
 public:
-    char word[50];
+    string word;
     HashNode *next;
 
-    HashNode(const char *w)
+    HashNode(string w)
     {
-        strcpy(word, w);
+        word = w;
         next = NULL;
     }
 };
 
-class HashTable
-{
+class HashTable{
 private:
     HashNode **table;
     int size;
 
-    // Hash function..
-    int hash(const char *word)
-    {
-        int h = 0;
-        for (int i = 0; word[i] != '\0'; i++)
-        {
+    int hash(string word){
+        long long h = 0;
+
+        for (int i = 0; i < word.length(); i++)
             h = (h * 31 + word[i]) % size;
-        }
-        return h;
+
+        return (int)h;
     }
 
 public:
-    HashTable(int s = 50000)
-    {
+    HashTable(int s = 50000){
         size = s;
         table = new HashNode *[size];
+
         for (int i = 0; i < size; i++)
             table[i] = NULL;
     }
 
-    void insert(const char *word)
-    {
+    void insert(string word){
         int index = hash(word);
         HashNode *node = new HashNode(word);
 
@@ -164,41 +142,37 @@ public:
         table[index] = node;
     }
 
-    bool exists(const char *word)
-    {
+    bool exists(string word){
         int index = hash(word);
         HashNode *current = table[index];
 
-        while (current != NULL)
-        {
-            if (strcmp(current->word, word) == 0)
+        while (current != NULL){
+            if (current->word == word)
                 return true;
+
             current = current->next;
         }
+
         return false;
     }
 };
 
-// Dictionary Class
-class DictionaryLoader
-{
+
+// Loading dictionay using filing
+class DictionaryLoader{
 public:
-    static void loadDictionary(const char *filename, Trie &trie, HashTable &ht)
-    {
+    static void loadDictionary(string filename, Trie &trie, HashTable &ht){
         ifstream fin(filename);
 
-        if (!fin)
-        {
-            cout << "Cannot open dictionary file...." << endl;
+        if (!fin){
+            cout << "Cannot open dictionary file..." << endl;
             return;
         }
 
-        char word[50];
+        string word;
 
-        while (fin >> word)
-        {
-            // lowercase vonverstion
-            for (int i = 0; word[i] != '\0'; i++)
+        while (fin >> word){
+            for (int i = 0; i < word.length(); i++)
             {
                 if (word[i] >= 'A' && word[i] <= 'Z')
                     word[i] = word[i] - 'A' + 'a';
@@ -213,22 +187,26 @@ public:
     }
 };
 
-int main()
-{
+int main(){
     Trie trie;
     HashTable ht(50000);
 
-    // Dictionary Loading...
     DictionaryLoader::loadDictionary("dictionary.txt", trie, ht);
 
-    cout << "Testing Trie Search: " << endl;
-    cout << "Search 'hello': " << (trie.searchWord("hello") ? "FOUND" : "NOT FOUND") << endl;
+    cout << "Testing Trie Search:" << endl;
+    if (trie.searchWord("hello"))
+        cout << "FOUND\n";
+    else
+        cout << "NOT FOUND\n";
 
-    cout << "Testing Autocomplete for 'he': " << endl;
+    cout << "Autocomplete for 'he':" << endl;
     trie.autocomplete("he");
 
-    cout << "Testing HashTable Exists: " << endl;
-    cout << "Word exists? 'apple': " << (ht.exists("apple") ? "YES" : "NO") << endl;
+    cout << "Check HashTable for 'apple': ";
+    if (ht.exists("apple"))
+        cout << "YES" << endl;
+    else
+        cout << "NO" << endl;
 
     return 0;
 }
