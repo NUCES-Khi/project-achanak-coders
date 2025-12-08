@@ -326,9 +326,11 @@ public:
 
     void show()
     {
-        cout << endl << "----- TEXT -----" << endl;
+        cout << endl
+             << "----- TEXT -----" << endl;
         cout << text;
-        cout << endl << "----------------" << endl;
+        cout << endl
+             << "----------------" << endl;
     }
 };
 
@@ -741,7 +743,8 @@ public:
         cout << "  /undo  -> undo last edit" << endl;
         cout << "  /redo  -> redo last edit" << endl;
         cout << "  /ac    -> autocomplete last word" << endl;
-        cout << "  /exit  -> exit" << endl << endl;
+        cout << "  /exit  -> exit" << endl
+             << endl;
 
         while (true)
         {
