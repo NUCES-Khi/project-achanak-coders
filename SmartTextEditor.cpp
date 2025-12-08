@@ -338,7 +338,7 @@ public:
 class Action
 {
 public:
-    char type; // 'i' insert, 'd' delete
+    char type; // 'i' for insert, 'd' for delete
     char ch;
     int pos;
     Action *next;
@@ -577,6 +577,7 @@ private:
 
         buffer.setText(updated);
 
+        // clear undo/redo because positions from character actions are no more valid
         undoStack.clear();
         redoStack.clear();
     }
@@ -593,6 +594,7 @@ public:
     {
         int pos = buffer.length();
         buffer.insertAt(pos, ch);
+        // store character action for undo/redo
         undoStack.push('i', ch, pos);
         redoStack.clear();
     }
@@ -695,23 +697,45 @@ public:
             buffer.show();
         }
     }
-
+    
     void undo()
     {
         char t, c;
         int p;
-        if (!undoStack.pop(t, c, p))
+
+        bool removedAny = false;
+
+        while (true)
         {
-            cout << "Nothing to undo..." << endl;
-            return;
+            if (!undoStack.pop(t, c, p))
+            {
+                if (!removedAny)
+                    cout << "Nothing to undo..." << endl;
+                break;
+            }
+
+            // reverse the action
+            if (t == 'i')
+                buffer.deleteAt(p);
+            else if (t == 'd')
+                buffer.insertAt(p, c);
+
+            // push into redo stack
+            redoStack.push(t, c, p);
+
+            bool isSpace = (c == ' ' || c == '\n' || c == '\t');
+
+            if (!isSpace)
+            {
+                removedAny = true; // at least part of a word removed
+            }
+            else
+            {
+                if (removedAny)
+                    break;
+            }
         }
 
-        if (t == 'i')
-            buffer.deleteAt(p);
-        else if (t == 'd')
-            buffer.insertAt(p, c);
-
-        redoStack.push(t, c, p);
         buffer.show();
     }
 
@@ -719,18 +743,40 @@ public:
     {
         char t, c;
         int p;
-        if (!redoStack.pop(t, c, p))
+
+        bool restoredAny = false;
+
+        while (true)
         {
-            cout << "Nothing to redo..." << endl;
-            return;
+            if (!redoStack.pop(t, c, p))
+            {
+                if (!restoredAny)
+                    cout << "Nothing to redo..." << endl;
+                break;
+            }
+
+            // redo the original action
+            if (t == 'i')
+                buffer.insertAt(p, c);
+            else if (t == 'd')
+                buffer.deleteAt(p);
+
+            // push back into undo stack
+            undoStack.push(t, c, p);
+
+            bool isSpace = (c == ' ' || c == '\n' || c == '\t');
+
+            if (!isSpace)
+            {
+                restoredAny = true; // at least part of a word restored
+            }
+            else
+            {
+                if (restoredAny)
+                    break;
+            }
         }
 
-        if (t == 'i')
-            buffer.insertAt(p, c);
-        else if (t == 'd')
-            buffer.deleteAt(p);
-
-        undoStack.push(t, c, p);
         buffer.show();
     }
 
@@ -740,8 +786,8 @@ public:
         cout << "Commands: " << endl;
         cout << "  /save  -> save file" << endl;
         cout << "  /open  -> open file" << endl;
-        cout << "  /undo  -> undo last edit" << endl;
-        cout << "  /redo  -> redo last edit" << endl;
+        cout << "  /undo  -> undo last edit (whole word)" << endl;
+        cout << "  /redo  -> redo last edit (whole word)" << endl;
         cout << "  /ac    -> autocomplete last word" << endl;
         cout << "  /exit  -> exit" << endl
              << endl;
