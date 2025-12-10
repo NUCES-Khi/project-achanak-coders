@@ -3,18 +3,19 @@
 #include <string>
 using namespace std;
 
-// TrieNode and Trie DataSTrucutre for autocompletion..
+// TrieNode and Trie DataSTrucutre forautocompletion..
 class TrieNode
 {
 public:
     TrieNode *children[26];
-    bool isEnd;
+    bool isWordEnd;
 
-    TrieNode()
+    TrieNode() : isWordEnd(false)
     {
-        isEnd = false;
-        for (int i = 0; i < 26; i++)
+        for(int i = 0; i < 26; ++i)
+        {
             children[i] = NULL;
+        }
     }
 };
 
@@ -23,78 +24,66 @@ class Trie
 private:
     TrieNode *root;
 
-    // DFS[Depth First Search] for autocomplete....
-    void dfsCollect(TrieNode *node, string prefix, string suggestions[], int &count, int maxSug)
+    // DFS[Depth First Search] forautocomplete....
+    void collect(TrieNode *node, string word, string out[], int &cnt, int limit)
     {
-        if (node == NULL || count >= maxSug)
+        if(!node || cnt >= limit)
             return;
 
-        if (node->isEnd)
+        if(node->isWordEnd)
         {
-            suggestions[count] = prefix;
-            count++;
-            if (count >= maxSug)
+            out[cnt++] = word;
+            if(cnt >= limit)
                 return;
         }
 
-        for (int i = 0; i < 26 && count < maxSug; i++)
+        for(int i = 0; i < 26 && cnt < limit; ++i)
         {
-            if (node->children[i] != NULL)
+            if(node->children[i])
             {
-                char nextChar = 'a' + i;
-                dfsCollect(node->children[i], prefix + nextChar, suggestions, count, maxSug);
+                char ch = 'a' + i;
+                collect(node->children[i], word + ch, out, cnt, limit);
             }
         }
     }
 
     // Edit distance..
-    void dfsEditDistance(TrieNode *node, char currentChar, string prefix, string target, int *prevRow, int targetLen, int maxCost, string suggestions[], int &count, int maxSug)
+    void searchByEditDistance(TrieNode *node, char ch, string built, const string &target, int *prevRow, int len, int cost, string out[], int &cnt, int limit)
     {
-        if (node == NULL || count >= maxSug)
+        if(!node || cnt >= limit)
             return;
 
-        int *currentRow = new int[targetLen + 1];
+        int *row = new int[len + 1];
+        row[0] = prevRow[0] + 1;
+        int minVal = row[0];
 
-        currentRow[0] = prevRow[0] + 1;
-        int minInRow = currentRow[0];
-
-        for (int j = 1; j <= targetLen; j++)
+        for(int j = 1; j <= len; ++j)
         {
-            int insertCost = currentRow[j - 1] + 1;
-            int deleteCost = prevRow[j] + 1;
-            int replaceCost = prevRow[j - 1] + (target[j - 1] == currentChar ? 0 : 1);
-
-            int val = insertCost;
-            if (deleteCost < val)
-                val = deleteCost;
-            if (replaceCost < val)
-                val = replaceCost;
-
-            currentRow[j] = val;
-            if (val < minInRow)
-                minInRow = val;
+            int ins = row[j - 1] + 1;
+            int del = prevRow[j] + 1;
+            int rep = prevRow[j - 1] + (target[j - 1] != ch);
+            row[j] = min(ins, min(del, rep));
+            minVal = min(minVal, row[j]);
         }
 
-        // store suggestion if it is a word and within allowed cost
-        if (node->isEnd && currentRow[targetLen] <= maxCost && count < maxSug)
+        if(node->isWordEnd && row[len] <= cost && cnt < limit)
         {
-            suggestions[count] = prefix;
-            count++;
+            out[cnt++] = built;
         }
 
-        if (minInRow <= maxCost && count < maxSug)
+        if(minVal <= cost && cnt < limit)
         {
-            for (int i = 0; i < 26 && count < maxSug; i++)
+            for(int i = 0; i < 26 && cnt < limit; ++i)
             {
-                if (node->children[i] != NULL)
+                if(node->children[i])
                 {
-                    char nextChar = 'a' + i;
-                    dfsEditDistance(node->children[i], nextChar, prefix + nextChar, target, currentRow, targetLen, maxCost, suggestions, count, maxSug);
+                    char next = 'a' + i;
+                    searchByEditDistance(node->children[i], next, built + next, target, row, len, cost, out, cnt, limit);
                 }
             }
         }
 
-        delete[] currentRow;
+        delete[] row;
     }
 
 public:
@@ -103,96 +92,76 @@ public:
         root = new TrieNode();
     }
 
-    void insertWord(string word)
+    void insert(const string &word)
     {
-        TrieNode *current = root;
-
-        for (int i = 0; i < word.length(); i++)
+        TrieNode *cur = root;
+        for(char c : word)
         {
-            char c = word[i];
-            if (c < 'a' || c > 'z')
+            if(c < 'a' || c > 'z')
                 continue;
-
-            int index = c - 'a';
-            if (current->children[index] == NULL)
-                current->children[index] = new TrieNode();
-
-            current = current->children[index];
+            int idx = c - 'a';
+            if(!cur->children[idx])
+                cur->children[idx] = new TrieNode();
+            cur = cur->children[idx];
         }
-        current->isEnd = true;
+        cur->isWordEnd = true;
     }
 
-    bool searchWord(string word)
+    bool contains(const string &word)
     {
-        TrieNode *current = root;
-
-        for (int i = 0; i < word.length(); i++)
+        TrieNode *cur = root;
+        for(char c : word)
         {
-            int index = word[i] - 'a';
-            if (index < 0 || index > 25)
+            int idx = c - 'a';
+            if(idx < 0 || idx >= 26 || !cur->children[idx])
                 return false;
-
-            if (current->children[index] == NULL)
-                return false;
-
-            current = current->children[index];
+            cur = cur->children[idx];
         }
-        return current->isEnd;
+        return cur->isWordEnd;
     }
 
-    // Autocompletion
-    int getSuggestions(string prefix, string suggestions[], int maxSug)
+    int suggest(const string &prefix, string out[], int max = 10)
     {
-        TrieNode *current = root;
-
-        for (int i = 0; i < prefix.length(); i++)
+        TrieNode *cur = root;
+        for(char c : prefix)
         {
-            int index = prefix[i] - 'a';
-            if (index < 0 || index > 25 || current->children[index] == NULL)
-            {
+            int idx = c - 'a';
+            if(idx < 0 || idx >= 26 || !cur->children[idx])
                 return 0;
-            }
-            current = current->children[index];
+            cur = cur->children[idx];
         }
-
-        int count = 0;
-        dfsCollect(current, prefix, suggestions, count, maxSug);
-        return count;
+        int cnt = 0;
+        collect(cur, prefix, out, cnt, max);
+        return cnt;
     }
 
-    // Suggestion using edit distance...
-    int getApproximateSuggestions(string target, string suggestions[], int maxSug, int maxCost)
+    int approxSuggestion(const string &word, string out[], int max = 10, int cost = 2)
     {
-        int targetLen = target.length();
-        if (targetLen == 0)
+        int len = word.length();
+        if(len == 0)
             return 0;
 
-        // row for distance from empty prefix
-        int *currentRow = new int[targetLen + 1];
-        for (int j = 0; j <= targetLen; j++)
-            currentRow[j] = j;
+        int *row = new int[len + 1];
+        for(int j = 0; j <= len; ++j)
+            row[j] = j;
 
-        int count = 0;
-
-        for (int i = 0; i < 26 && count < maxSug; i++)
+        int cnt = 0;
+        for(int i = 0; i < 26 && cnt < max; ++i)
         {
             TrieNode *child = root->children[i];
-            if (child != NULL)
+            if(child)
             {
-                char c = 'a' + i;
-                string prefix = "";
-                prefix += c;
-
-                dfsEditDistance(child, c, prefix, target, currentRow, targetLen, maxCost, suggestions, count, maxSug);
+                char ch = 'a' + i;
+                searchByEditDistance(child, ch, string(1, ch), word, row, len, cost, out, cnt, max);
             }
         }
 
-        delete[] currentRow;
-        return count;
+        delete[] row;
+        return cnt;
     }
 };
 
-// Maping words for to spell checking...
+// Maping words forto spell checking...
 class HashNode
 {
 public:
@@ -215,7 +184,7 @@ private:
     int hash(string word)
     {
         long long h = 0;
-        for (int i = 0; i < word.length(); i++)
+        for(int i = 0; i < word.length(); i++)
             h = (h * 31 + word[i]) % size;
         return (int)h;
     }
@@ -225,7 +194,7 @@ public:
     {
         size = s;
         table = new HashNode *[size];
-        for (int i = 0; i < size; i++)
+        for(int i = 0; i < size; i++)
             table[i] = NULL;
     }
 
@@ -241,9 +210,9 @@ public:
     {
         int index = hash(word);
         HashNode *cur = table[index];
-        while (cur != NULL)
+        while(cur != NULL)
         {
-            if (cur->word == word)
+            if(cur->word == word)
                 return true;
             cur = cur->next;
         }
@@ -255,24 +224,24 @@ public:
 class DictionaryLoader
 {
 public:
-    static void loadDictionary(string filename, Trie &trie, HashTable &ht)
+    static void loadDictionary(string filename, Trie &trie, HashTable &dictHash)
     {
         ifstream fin(filename);
-        if (!fin)
+        if(!fin)
         {
             cout << "Dictionary file missing..." << endl;
             return;
         }
 
         string word;
-        while (fin >> word)
+        while(fin >> word)
         {
-            for (int i = 0; i < word.length(); i++)
-                if (word[i] >= 'A' && word[i] <= 'Z')
+            for(int i = 0; i < word.length(); i++)
+                if(word[i] >= 'A' && word[i] <= 'Z')
                     word[i] = word[i] - 'A' + 'a';
 
-            trie.insertWord(word);
-            ht.insert(word);
+            trie.insert(word);
+            dictHash.insert(word);
         }
 
         cout << "Dictionary Loaded..." << endl;
@@ -288,16 +257,16 @@ private:
 public:
     void insertAt(int pos, char ch)
     {
-        if (pos < 0)
+        if(pos < 0)
             pos = 0;
-        if (pos > text.length())
+        if(pos > text.length())
             pos = text.length();
         text.insert(pos, 1, ch);
     }
 
     void deleteAt(int pos)
     {
-        if (pos < 0 || pos >= text.length())
+        if(pos < 0 || pos >= text.length())
             return;
         text.erase(pos, 1);
     }
@@ -309,7 +278,7 @@ public:
 
     char getCharAt(int pos)
     {
-        if (pos < 0 || pos >= text.length())
+        if(pos < 0 || pos >= text.length())
             return '\0';
         return text[pos];
     }
@@ -326,19 +295,17 @@ public:
 
     void show()
     {
-        cout << endl
-             << "----- TEXT -----" << endl;
+        cout << endl << "----- TEXT -----" << endl;
         cout << text;
-        cout << endl
-             << "----------------" << endl;
+        cout << endl << "----------------" << endl;
     }
 };
 
-/// Stack and action.. Action for undo and redo the task.. stack to store the character for undeo and redo...
+/// Stack and action.. Action forundo and redo the task.. stack to store the character forundeo and redo...
 class Action
 {
 public:
-    char type; // 'i' for insert, 'd' for delete
+    char type; // 'i' insert, 'd' delete
     char ch;
     int pos;
     Action *next;
@@ -371,7 +338,7 @@ public:
 
     bool pop(char &t, char &c, int &p)
     {
-        if (top == NULL)
+        if(top == NULL)
             return false;
 
         Action *temp = top;
@@ -387,8 +354,9 @@ public:
     {
         char t, c;
         int p;
-        while (pop(t, c, p))
+        while(pop(t, c, p))
         {
+            // Loopp Until empty...
         }
     }
 };
@@ -398,39 +366,39 @@ class SpellChecker
 {
 private:
     Trie *trie;
-    HashTable *ht;
+    HashTable *dictHash;
 
 public:
     SpellChecker()
     {
         trie = NULL;
-        ht = NULL;
+        dictHash = NULL;
     }
 
     SpellChecker(Trie *t, HashTable *h)
     {
         trie = t;
-        ht = h;
+        dictHash = h;
     }
 
     void setData(Trie *t, HashTable *h)
     {
         trie = t;
-        ht = h;
+        dictHash = h;
     }
 
-    void checkWord(string word)
+    void check(string word)
     {
         int n = word.length();
-        if (n == 0)
+        if(n == 0)
             return;
 
         // lowercase
-        for (int i = 0; i < n; i++)
-            if (word[i] >= 'A' && word[i] <= 'Z')
+        for(int i = 0; i < n; i++)
+            if(word[i] >= 'A' && word[i] <= 'Z')
                 word[i] = word[i] - 'A' + 'a';
 
-        if (ht->exists(word))
+        if(dictHash->exists(word))
         {
             cout << "[OK:" << word << "] ";
         }
@@ -448,13 +416,13 @@ public:
     static string ensureTxt(string name)
     {
         int n = name.length();
-        if (n >= 4)
+        if(n >= 4)
         {
             char a = name[n - 4];
             char b = name[n - 3];
             char c = name[n - 2];
             char d = name[n - 1];
-            if (a == '.' &&
+            if(a == '.' &&
                 (b == 't' || b == 'T') &&
                 (c == 'x' || c == 'X') &&
                 (d == 't' || d == 'T'))
@@ -469,7 +437,7 @@ public:
     {
         filename = ensureTxt(filename);
         ofstream fout(filename);
-        if (!fout)
+        if(!fout)
         {
             cout << "Error saving file...." << endl;
             return;
@@ -483,13 +451,13 @@ public:
     {
         filename = ensureTxt(filename);
         ifstream fin(filename);
-        if (!fin)
+        if(!fin)
         {
             cout << "File not found..." << endl;
             return "";
         }
         string line, full = "";
-        while (getline(fin, line))
+        while(getline(fin, line))
             full += line + "\n";
         fin.close();
         cout << "Loaded: " << filename << endl;
@@ -504,21 +472,21 @@ private:
     TextBuffer buffer;
     Stack undoStack, redoStack;
     Trie *trie;
-    HashTable *ht;
+    HashTable *dictHash;
     SpellChecker checker;
 
     string trim(string s)
     {
-        int n = s.length();
-        int i = 0;
-        while (i < n && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n'))
-            i++;
-        int j = n - 1;
-        while (j >= 0 && (s[j] == ' ' || s[j] == '\t' || s[j] == '\r' || s[j] == '\n'))
+        int end = s.length();
+        int start = 0;
+        while(start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\r' || s[start] == '\n'))
+            start++;
+        int j = end - 1;
+        while(j >= 0 && (s[j] == ' ' || s[j] == '\t' || s[j] == '\r' || s[j] == '\n'))
             j--;
-        if (i > j)
+        if(start > j)
             return "";
-        return s.substr(i, j - i + 1);
+        return s.substr(start, j - start + 1);
     }
 
     string getLastWord()
@@ -526,19 +494,19 @@ private:
         string t = buffer.getText();
         int i = t.length() - 1;
 
-        while (i >= 0 && (t[i] == ' ' || t[i] == '\n' || t[i] == '\t'))
+        while(i >= 0 && (t[i] == ' ' || t[i] == '\n' || t[i] == '\t'))
             i--;
 
-        if (i < 0)
+        if(i < 0)
             return "";
 
         int end = i;
 
-        while (i >= 0 && t[i] != ' ' && t[i] != '\n' && t[i] != '\t')
+        while(i >= 0 && t[i] != ' ' && t[i] != '\n' && t[i] != '\t')
             i--;
 
         int start = i + 1;
-        if (start > end)
+        if(start > end)
             return "";
 
         return t.substr(start, end - start + 1);
@@ -550,21 +518,21 @@ private:
         int i = t.length() - 1;
 
         // Remove newline caused by enter
-        if (i >= 0 && t[i] == '\n')
+        if(i >= 0 && t[i] == '\n')
         {
             t.erase(i, 1);
             i--;
         }
 
         // Skip spaces
-        while (i >= 0 && (t[i] == ' ' || t[i] == '\t'))
+        while(i >= 0 && (t[i] == ' ' || t[i] == '\t'))
             i--;
 
-        if (i < 0)
+        if(i < 0)
             return;
 
         int end = i;
-        while (i >= 0 && t[i] != ' ' && t[i] != '\t')
+        while(i >= 0 && t[i] != ' ' && t[i] != '\t')
             i--;
 
         int start = i + 1;
@@ -577,7 +545,6 @@ private:
 
         buffer.setText(updated);
 
-        // clear undo/redo because positions from character actions are no more valid
         undoStack.clear();
         redoStack.clear();
     }
@@ -586,7 +553,7 @@ public:
     Editor(Trie *t, HashTable *h)
     {
         trie = t;
-        ht = h;
+        dictHash = h;
         checker.setData(t, h);
     }
 
@@ -594,20 +561,19 @@ public:
     {
         int pos = buffer.length();
         buffer.insertAt(pos, ch);
-        // store character action for undo/redo
         undoStack.push('i', ch, pos);
         redoStack.clear();
     }
 
-    void spellCheckLineWords(string line)
+    void spellCheckLine(string line)
     {
         string word = "";
-        for (int i = 0; i < line.length(); i++)
+        for(int i = 0; i < line.length(); i++)
         {
             char c = line[i];
-            if (c == ' ' || c == '\t')
+            if(c == ' ' || c == '\t')
             {
-                checker.checkWord(word);
+                checker.check(word);
                 word = "";
             }
             else
@@ -615,34 +581,34 @@ public:
                 word += c;
             }
         }
-        checker.checkWord(word);
+        checker.check(word);
         cout << endl;
     }
 
-    void autocompleteOnLastWord()
+    void autocompleteLastWord()
     {
         string prefix = getLastWord();
-        if (prefix == "")
+        if(prefix == "")
         {
             cout << "No word to autocomplete.." << endl;
             return;
         }
 
-        for (int i = 0; i < prefix.length(); i++)
-            if (prefix[i] >= 'A' && prefix[i] <= 'Z')
+        for(int i = 0; i < prefix.length(); i++)
+            if(prefix[i] >= 'A' && prefix[i] <= 'Z')
                 prefix[i] = prefix[i] - 'A' + 'a';
 
         string suggestions[10];
-        int count = trie->getSuggestions(prefix, suggestions, 10);
+        int count = trie->suggest(prefix, suggestions, 10);
 
-        if (count == 0)
+        if(count == 0)
         {
-            cout << "No suggestions.\n";
+            cout << "No suggestions...." << endl;
             return;
         }
 
-        cout << "Suggestions for \"" << prefix << "\":\n";
-        for (int i = 0; i < count; i++)
+        cout << "Suggestions for\"" << prefix << "\": " << endl;
+        for(int i = 0; i < count; i++)
             cout << (i + 1) << ". " << suggestions[i] << endl;
 
         cout << "Choice (0 cancel): ";
@@ -651,7 +617,7 @@ public:
         cin >> choice;
         cin.ignore(1000, '\n');
 
-        if (choice > 0 && choice <= count)
+        if(choice > 0 && choice <= count)
         {
             replaceLastWord(suggestions[choice - 1]);
             cout << "Replaced last word with: " << suggestions[choice - 1] << endl;
@@ -668,7 +634,7 @@ public:
         string name;
         getline(cin, name);
         name = trim(name);
-        if (name == "")
+        if(name == "")
         {
             cout << "No filename..." << endl;
             return;
@@ -683,13 +649,13 @@ public:
         getline(cin, name);
         name = trim(name);
 
-        if (name == "")
+        if(name == "")
         {
             cout << "No filename..." << endl;
             return;
         }
         string content = FileManager::loadFile(name);
-        if (content != "")
+        if(content != "")
         {
             buffer.setText(content);
             undoStack.clear();
@@ -697,7 +663,7 @@ public:
             buffer.show();
         }
     }
-    
+
     void undo()
     {
         char t, c;
@@ -705,33 +671,29 @@ public:
 
         bool removedAny = false;
 
-        while (true)
+        while(true)
         {
-            if (!undoStack.pop(t, c, p))
+            if(!undoStack.pop(t, c, p))
             {
-                if (!removedAny)
+                if(!removedAny)
                     cout << "Nothing to undo..." << endl;
                 break;
             }
 
-            // reverse the action
-            if (t == 'i')
+            if(t == 'i')
                 buffer.deleteAt(p);
-            else if (t == 'd')
+            else if(t == 'd')
                 buffer.insertAt(p, c);
 
-            // push into redo stack
             redoStack.push(t, c, p);
-
             bool isSpace = (c == ' ' || c == '\n' || c == '\t');
-
-            if (!isSpace)
+            if(!isSpace)
             {
-                removedAny = true; // at least part of a word removed
+                removedAny = true;
             }
             else
             {
-                if (removedAny)
+                if(removedAny)
                     break;
             }
         }
@@ -746,33 +708,31 @@ public:
 
         bool restoredAny = false;
 
-        while (true)
+        while(true)
         {
-            if (!redoStack.pop(t, c, p))
+            if(!redoStack.pop(t, c, p))
             {
-                if (!restoredAny)
+                if(!restoredAny)
                     cout << "Nothing to redo..." << endl;
                 break;
             }
 
-            // redo the original action
-            if (t == 'i')
+            if(t == 'i')
                 buffer.insertAt(p, c);
-            else if (t == 'd')
+            else if(t == 'd')
                 buffer.deleteAt(p);
 
-            // push back into undo stack
             undoStack.push(t, c, p);
 
             bool isSpace = (c == ' ' || c == '\n' || c == '\t');
 
-            if (!isSpace)
+            if(!isSpace)
             {
-                restoredAny = true; // at least part of a word restored
+                restoredAny = true;
             }
             else
             {
-                if (restoredAny)
+                if(restoredAny)
                     break;
             }
         }
@@ -786,29 +746,29 @@ public:
         cout << "Commands: " << endl;
         cout << "  /save  -> save file" << endl;
         cout << "  /open  -> open file" << endl;
-        cout << "  /undo  -> undo last edit (whole word)" << endl;
-        cout << "  /redo  -> redo last edit (whole word)" << endl;
+        cout << "  /undo  -> undo last edit" << endl;
+        cout << "  /redo  -> redo last edit" << endl;
         cout << "  /ac    -> autocomplete last word" << endl;
         cout << "  /exit  -> exit" << endl
              << endl;
 
-        while (true)
+        while(true)
         {
             cout << "> ";
             string line;
-            if (!getline(cin, line))
+            if(!getline(cin, line))
                 break;
 
             string cmd = trim(line);
 
             // Exit
-            if (cmd == "/exit")
+            if(cmd == "/exit")
             {
                 cout << "Save before exit? (y/n): ";
                 char ch;
                 cin >> ch;
                 cin.ignore(1000, '\n');
-                if (ch == 'y' || ch == 'Y')
+                if(ch == 'y' || ch == 'Y')
                 {
                     saveFile();
                 }
@@ -816,69 +776,67 @@ public:
             }
 
             // All Commands..
-            if (cmd == "/save")
+            if(cmd == "/save")
             {
                 saveFile();
                 continue;
             }
 
-            if (cmd == "/open")
+            if(cmd == "/open")
             {
                 openFile();
                 continue;
             }
 
-            if (cmd == "/undo")
+            if(cmd == "/undo")
             {
                 undo();
                 continue;
             }
 
-            if (cmd == "/redo")
+            if(cmd == "/redo")
             {
                 redo();
                 continue;
             }
 
             // /ac
-            if (cmd == "/ac")
+            if(cmd == "/ac")
             {
-                autocompleteOnLastWord();
+                autocompleteLastWord();
                 buffer.show();
                 continue;
             }
 
-            // inline '/ac"
+            //  '/ac" direct affter word...
             int pos = line.rfind("/ac");
             bool inlineAc = false;
 
-            if (pos != -1)
+            if(pos != -1)
             {
                 int j = pos + 3;
-                while (j < line.length() && (line[j] == ' ' || line[j] == '\t'))
+                while(j < line.length() && (line[j] == ' ' || line[j] == '\t'))
                     j++;
-                // "/ac"  at end
-                if (j == line.length())
+                if(j == line.length())
                 {
                     inlineAc = true;
                 }
             }
 
-            if (inlineAc)
+            if(inlineAc)
             {
                 // Text before "/ac"
                 string part = line.substr(0, pos);
-                // right-trim spaces
                 int end = part.length() - 1;
-                while (end >= 0 && (part[end] == ' ' || part[end] == '\t'))
+                while(end >= 0 && (part[end] == ' ' || part[end] == '\t'))
                     end--;
-                if (end >= 0)
+                if(end >= 0)
                     part = part.substr(0, end + 1);
                 else
                     part = "";
 
-                // Add that text to buffer
-                for (int i = 0; i < part.length(); i++)
+                // Add that text to buffer....
+                for(int i = 0; i < part.length(); i++)
                 {
                     char ch2 = part[i];
                     typeChar(ch2);
@@ -887,18 +845,18 @@ public:
 
                 // Spell checking..
                 cout << "Spell check: ";
-                spellCheckLineWords(part);
+                spellCheckLine(part);
 
                 buffer.show();
 
-                // autocomplete on last word in buffer
-                autocompleteOnLastWord();
+                // autocomplete on last word in buffer..
+                autocompleteLastWord();
                 buffer.show();
                 continue;
             }
 
-            // Simple textline
-            for (int i = 0; i < line.length(); i++)
+            // Simple textline...
+            for(int i = 0; i < line.length(); i++)
             {
                 char ch2 = line[i];
                 typeChar(ch2);
@@ -906,12 +864,13 @@ public:
             typeChar('\n');
 
             cout << "Spell check: ";
-            spellCheckLineWords(line);
+            spellCheckLine(line);
 
             buffer.show();
         }
 
-        cout << "\nFinal document:\n";
+        cout << endl;
+        cout << "Final document: " << endl;
         buffer.show();
     }
 };
@@ -919,11 +878,11 @@ public:
 int main()
 {
     Trie trie;
-    HashTable ht(50000);
+    HashTable dictionary(50000);
 
-    DictionaryLoader::loadDictionary("dictionary.txt", trie, ht);
+    DictionaryLoader::loadDictionary("dictionary.txt", trie, dictionary);
 
-    Editor editor(&trie, &ht);
+    Editor editor(&trie, &dictionary);
     editor.run();
 
     return 0;
